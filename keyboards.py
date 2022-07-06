@@ -18,8 +18,18 @@ right_keyboard = ReplyKeyboardMarkup(row_width=2, resize_keyboard=True).add(butt
 
 button4 = KeyboardButton('Отпрвавить сообщение подписчикам')
 button5 = KeyboardButton('Список пользователей')
+button6 = KeyboardButton('Список резюме')
 right_admin_keyboard = ReplyKeyboardMarkup(row_width=2, 
-                                           resize_keyboard=True).add(button1).row(button3, button2).row(button4, button5)
+                                           resize_keyboard=True).add(button1, button3).row(button2, button4).\
+                                           row(button5, button6)
+
+# approve
+
+def create_approve_kb(resume_id: int):
+    inline_btn_approve1 = InlineKeyboardButton('Поддтвердить', callback_data=f'approve{resume_id}')
+    inline_btn_approve2 = InlineKeyboardButton('Отклонить', callback_data='approve')
+    inline_kb_approve = InlineKeyboardMarkup().add(inline_btn_approve1, inline_btn_approve2)
+    return inline_kb_approve
 
 # send from admin / as - admin send
 

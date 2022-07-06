@@ -437,7 +437,8 @@ async def process_full_resume(message: types.Message, state: FSMContext):
 
     u = message.from_user.username
 
-    await bot.send_message(ADMIN, add_username(resume_text, u))
+    # await bot.send_message(ADMIN, add_username(resume_text, u))
+    BotDB.create_resume(user, message.text)
     await bot.send_message(user, "Резюме успешно отправлено Администратору", reply_markup=get_keyboard(user))
 
     await state.finish()
@@ -561,3 +562,39 @@ async def finished_resume_handler(callback_query: types.CallbackQuery, state: FS
         await bot.send_message(user, "Резюме удалено", reply_markup=get_keyboard(user))
 
     await state.finish()
+
+
+# resume checkout ----------------------------------------
+# resume checkout ----------------------------------------
+# resume checkout ----------------------------------------
+
+
+@dp.message_handler(Text(contains="Список резюме", ignore_case=True))
+async def resume_check(message: types.Message):
+
+    user = message.from_user.id
+
+    if user == ADMIN:
+        result = BotDB.get_last_resume()
+        if result is not None:
+            text = f"Резюме №{result[0]} \n\n{result[2]}"
+            await bot.send_message(user, text, reply_markup=kb.create_approve_kb(result[0]))
+        else:
+            await bot.send_message(user, "Список резюме пока пуст")
+
+
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith('approve'))
+async def process_callback_resume_check(callback_query: types.CallbackQuery):
+
+    code = callback_query.data[-1]
+    if code.isdigit():
+        code = int(code)
+
+        BotDB.update_approved(code)
+
+    user = callback_query.from_user.id
+
+    # await bot.send_message(user, "Как вас зовут?", reply_markup=kb.inline_kb_resume)
+
+
+

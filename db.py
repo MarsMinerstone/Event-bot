@@ -32,6 +32,20 @@ class BotDB:
         self.cursor.execute("INSERT INTO `users` (`user_id`, `username`) VALUES (?, ?)", (user_id, username))
         return self.conn.commit()
 
+    # next table
+
+    def create_resume(self, user_id, text):
+        self.cursor.execute("INSERT INTO `resumes` (`user_id`, `text`) VALUES (?, ?)", (user_id, text))
+        return self.conn.commit()
+
+    def get_last_resume(self):
+        result = self.cursor.execute("SELECT `id`, `user_id`, `text`, `approved` FROM `resumes` WHERE `approved` = FALSE")
+        return result.fetchone()
+
+    def update_approved(self, resume_id):
+        self.cursor.execute("UPDATE `resumes` SET `approved` = TRUE WHERE `id` = ?", (resume_id,))
+        return self.conn.commit()
+
     def close(self):
         """Закрываем соединение с БД"""
         self.connection.close()
