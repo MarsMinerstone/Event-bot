@@ -433,13 +433,14 @@ async def process_full_resume(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data['full_resume'] = message.text
 
-    resume_text = f"*РЕЗЮМЕ* \n\n{data['place']} \n\n{data['full_resume']}"
+    resume_text = f"{data['place']} \n\n{data['full_resume']}"
 
     u = message.from_user.username
 
     # await bot.send_message(ADMIN, add_username(resume_text, u))
-    BotDB.create_resume(user, message.text)
-    await bot.send_message(user, "Резюме успешно отправлено Администратору", reply_markup=get_keyboard(user))
+    resume_id = BotDB.create_resume(user, resume_text)
+
+    await bot.send_message(user, f"Резюме №{resume_id} успешно добавлено в базу", reply_markup=get_keyboard(user))
 
     await state.finish()
 
@@ -569,32 +570,65 @@ async def finished_resume_handler(callback_query: types.CallbackQuery, state: FS
 # resume checkout ----------------------------------------
 
 
+class FormComment(StatesGroup):
+    resume_user = State()
+
+
 @dp.message_handler(Text(contains="Список резюме", ignore_case=True))
-async def resume_check(message: types.Message):
+async def resume_check(message: types.Message, flag: int = 0):
 
     user = message.from_user.id
 
-    if user == ADMIN:
-        result = BotDB.get_last_resume()
-        if result is not None:
-            text = f"Резюме №{result[0]} \n\n{result[2]}"
-            await bot.send_message(user, text, reply_markup=kb.create_approve_kb(result[0]))
-        else:
-            await bot.send_message(user, "Список резюме пока пуст")
+    if user != ADMIN and flag == 0:
+        return
 
+    result = BotDB.get_last_resume()
+    if result is not None:
+        text = f"Резюме №{result[0]} \n\n{result[2]}"
 
+        if flag == 0:     
+            await bot.send_message(ADMIN, text, reply_markup=kb.create_approve_kb(result[0], result[1]))
+            
+        elif flag == 1:
+            await message.edit_text(text, reply_markup=kb.create_approve_kb(result[0], result[1]))
+    else:
+        await bot.send_message(ADMIN, "Список резюме пока пуст")
+
+    
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith('approve'))
-async def process_callback_resume_check(callback_query: types.CallbackQuery):
+async def process_callback_resume_check(callback_query: types.CallbackQuery, state: FSMContext):
 
-    code = callback_query.data[-1]
-    if code.isdigit():
-        code = int(code)
+    resumeid_userid = callback_query.data.replace("approve", "")
 
-        BotDB.update_approved(code)
+    if resumeid_userid.isdigit():                       # looks like approve12
+        resumeid = int(resumeid_userid)
 
-    user = callback_query.from_user.id
+        BotDB.update_approved(resumeid)
 
-    # await bot.send_message(user, "Как вас зовут?", reply_markup=kb.inline_kb_resume)
+        await resume_check(callback_query.message, 1)
+
+    else:                                               # looks like approve12_456789765
+        resumeid, userid = resumeid_userid.split("_")
+
+        await FormComment.resume_user.set()
+
+        await state.update_data(resume_user=resumeid_userid)
+
+        BotDB.delete_disapproved(resumeid)
+
+        await callback_query.message.edit_text("Отклонено", reply_markup=kb.inline_kb_empty)
+        await bot.send_message(ADMIN, "Напишите сообщение для этого пользователя:", 
+                               reply_markup=types.ReplyKeyboardRemove())
 
 
+@dp.message_handler(state=FormComment.resume_user)
+async def comment(message: types.Message, state: FSMContext):
 
+    async with state.proxy() as data:
+        resumeid, userid = data['resume_user'].split("_")
+
+    await bot.send_message(userid, f"Резюме №{resumeid} \n\nКомментарий от администратора: \n{message.text}")
+
+    await bot.send_message(ADMIN, "Сообщение было отправленно", reply_markup=get_keyboard(ADMIN))
+
+    await state.finish()

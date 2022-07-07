@@ -35,15 +35,25 @@ class BotDB:
     # next table
 
     def create_resume(self, user_id, text):
+        """Добавляем резюме в базу и возвращаем id"""
         self.cursor.execute("INSERT INTO `resumes` (`user_id`, `text`) VALUES (?, ?)", (user_id, text))
-        return self.conn.commit()
+        self.conn.commit()
+        result = self.cursor.execute("SELECT `id`, `user_id` FROM `resumes` WHERE `user_id` = ? ORDER BY `id` DESC", (user_id,))
+        return result.fetchone()[0]
 
     def get_last_resume(self):
+        """Достаем первое резюме"""
         result = self.cursor.execute("SELECT `id`, `user_id`, `text`, `approved` FROM `resumes` WHERE `approved` = FALSE")
         return result.fetchone()
 
     def update_approved(self, resume_id):
+        """Подтверждаем резюме"""
         self.cursor.execute("UPDATE `resumes` SET `approved` = TRUE WHERE `id` = ?", (resume_id,))
+        return self.conn.commit()
+
+    def delete_disapproved(self, resume_id):
+        """Удаляем неподтвержденное резюме"""
+        self.cursor.execute("DELETE FROM `resumes` WHERE `id`=?", (resume_id,))
         return self.conn.commit()
 
     def close(self):

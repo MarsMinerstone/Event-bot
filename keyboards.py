@@ -7,6 +7,9 @@ from aiogram.types import \
 cancel_btn = KeyboardButton('cancel')
 cancel_kb = ReplyKeyboardMarkup(resize_keyboard=True).add(cancel_btn)
 
+inline_kb_empty = InlineKeyboardMarkup()
+kb_empty = ReplyKeyboardMarkup()
+
 # start
 
 button1 = KeyboardButton('Разместить вакансию')
@@ -25,9 +28,9 @@ right_admin_keyboard = ReplyKeyboardMarkup(row_width=2,
 
 # approve
 
-def create_approve_kb(resume_id: int):
+def create_approve_kb(resume_id: int, user_id: int):
     inline_btn_approve1 = InlineKeyboardButton('Поддтвердить', callback_data=f'approve{resume_id}')
-    inline_btn_approve2 = InlineKeyboardButton('Отклонить', callback_data='approve')
+    inline_btn_approve2 = InlineKeyboardButton('Отклонить', callback_data=f'approve{resume_id}_{user_id}')
     inline_kb_approve = InlineKeyboardMarkup().add(inline_btn_approve1, inline_btn_approve2)
     return inline_kb_approve
 
