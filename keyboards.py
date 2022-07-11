@@ -29,10 +29,18 @@ right_admin_keyboard = ReplyKeyboardMarkup(row_width=2,
 # approve
 
 def create_approve_kb(resume_id: int, user_id: int):
-    inline_btn_approve1 = InlineKeyboardButton('Поддтвердить', callback_data=f'approve{resume_id}')
-    inline_btn_approve2 = InlineKeyboardButton('Отклонить', callback_data=f'approve{resume_id}_{user_id}')
+    inline_btn_approve1 = InlineKeyboardButton('Поддтвердить', callback_data=f'approve{resume_id}_{user_id}_1')
+    inline_btn_approve2 = InlineKeyboardButton('Отклонить', callback_data=f'approve{resume_id}_{user_id}_2')
     inline_kb_approve = InlineKeyboardMarkup().add(inline_btn_approve1, inline_btn_approve2)
     return inline_kb_approve
+
+# pay
+
+def create_pay_kb(resume_id: int, user_id: int):
+    inline_btn_pay1 = InlineKeyboardButton('Оплатить', callback_data=f'pay{resume_id}_{user_id}_1')
+    inline_btn_pay2 = InlineKeyboardButton('Отменить', callback_data=f'pay{resume_id}_{user_id}_2')
+    inline_kb_pay = InlineKeyboardMarkup().add(inline_btn_pay1, inline_btn_pay2)
+    return inline_kb_pay
 
 # send from admin / as - admin send
 

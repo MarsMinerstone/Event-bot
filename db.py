@@ -46,9 +46,19 @@ class BotDB:
         result = self.cursor.execute("SELECT `id`, `user_id`, `text`, `approved` FROM `resumes` WHERE `approved` = FALSE")
         return result.fetchone()
 
+    def get_resume_by_id(self, resume_id):
+        """Достаем резюме по id"""
+        result = self.cursor.execute("SELECT `id`, `user_id`, `text` FROM `resumes` WHERE `id` = ?", (resume_id,))
+        return result.fetchone()
+
     def update_approved(self, resume_id):
         """Подтверждаем резюме"""
         self.cursor.execute("UPDATE `resumes` SET `approved` = TRUE WHERE `id` = ?", (resume_id,))
+        return self.conn.commit()
+
+    def update_published(self, resume_id):
+        """Публикуем резюме"""
+        self.cursor.execute("UPDATE `resumes` SET `published` = TRUE WHERE `id` = ?", (resume_id,))
         return self.conn.commit()
 
     def delete_disapproved(self, resume_id):

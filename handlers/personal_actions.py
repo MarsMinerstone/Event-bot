@@ -5,8 +5,9 @@ import keyboards as kb
 from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher import FSMContext
+from aiogram.types.message import ContentType
 from commands import *
-from config import ADMIN
+from config import ADMIN, YOUTOKEN, CHANNEL
 # from aiogram.methods import StopPoll
 # import asyncio
 
@@ -598,21 +599,24 @@ async def resume_check(message: types.Message, flag: int = 0):
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith('approve'))
 async def process_callback_resume_check(callback_query: types.CallbackQuery, state: FSMContext):
 
-    resumeid_userid = callback_query.data.replace("approve", "")
+    resumeid_userid_code = callback_query.data.replace("approve", "")
 
-    if resumeid_userid.isdigit():                       # looks like approve12
-        resumeid = int(resumeid_userid)
+    resumeid, userid, code = resumeid_userid_code.split("_")
 
+    if code.isdigit():
+        code = int(code)
+
+    if code == 1:                         
         BotDB.update_approved(resumeid)
+
+        await bot.send_message(userid, f"Резюме №{resumeid} готово к оплате", reply_markup=kb.create_pay_kb(resumeid, userid))
 
         await resume_check(callback_query.message, 1)
 
-    else:                                               # looks like approve12_456789765
-        resumeid, userid = resumeid_userid.split("_")
-
+    elif code == 2:                                               
         await FormComment.resume_user.set()
 
-        await state.update_data(resume_user=resumeid_userid)
+        await state.update_data(resume_user=f"{resumeid}_{userid}")
 
         BotDB.delete_disapproved(resumeid)
 
@@ -627,8 +631,57 @@ async def comment(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         resumeid, userid = data['resume_user'].split("_")
 
-    await bot.send_message(userid, f"Резюме №{resumeid} \n\nКомментарий от администратора: \n{message.text}")
+    await bot.send_message(userid, f"Резюме №{resumeid} \n\nКомментарий от администратора: \n{message.text} \
+                                   \n\nСоздайте резюме заново")
 
     await bot.send_message(ADMIN, "Сообщение было отправленно", reply_markup=get_keyboard(ADMIN))
 
     await state.finish()
+
+    await resume_check(message)
+
+
+# resume checkout ----------------------------------------
+# resume checkout ----------------------------------------
+# resume checkout ----------------------------------------
+
+
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith('pay'))
+async def process_callback_resume_pay(callback_query: types.CallbackQuery):
+
+    resumeid_userid_code = callback_query.data.replace("pay", "")
+
+    resumeid, userid, code = resumeid_userid_code.split("_")
+
+    if code.isdigit():
+        code = int(code)
+
+    if code == 1:
+        await bot.send_invoice(chat_id=userid, title=f"Оплата резюме №{resumeid}", \
+            description="После оплаты, ваше резюме появится в канале", \
+            payload=f"resume_pay__{resumeid}", provider_token=YOUTOKEN, currency="RUB", start_parameter="event_bot", \
+            prices=[{"label": "Руб", "amount": 30000}])
+
+    elif code == 2:
+        pass
+
+
+@dp.pre_checkout_query_handler()
+async def process_pre_checkout_query(pre_checkout_query: types.PreCheckoutQuery):
+    await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+
+
+@dp.message_handler(content_types=ContentType.SUCCESSFUL_PAYMENT)
+async def process_pay(message: types.Message):
+
+    payload, resumeid = message.successful_payment.invoice_payload.split("__")
+
+    if resumeid.isdigit():
+        resumeid = int(resumeid)
+
+    if payload == "resume_pay":
+        BotDB.update_published(resumeid)
+
+        text = BotDB.get_resume_by_id(resumeid)[2]
+
+        await bot.send_message(CHANNEL, text)
