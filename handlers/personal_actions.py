@@ -10,6 +10,8 @@ from commands import *
 from config import ADMIN, YOUTOKEN, CHANNEL
 # from aiogram.methods import StopPoll
 # import asyncio
+from channels import channels
+import re
 
 
 # support commands ----------------------------------------
@@ -434,7 +436,8 @@ async def process_full_resume(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data['full_resume'] = message.text
 
-    resume_text = f"{data['place']} \n\n{data['full_resume']}"
+    # resume_text = f"{data['place']} \n\n{data['full_resume']}"
+    resume_text = f"{data['full_resume']}"
 
     u = message.from_user.username
 
@@ -609,7 +612,15 @@ async def process_callback_resume_check(callback_query: types.CallbackQuery, sta
     if code == 1:                         
         BotDB.update_approved(resumeid)
 
-        await bot.send_message(userid, f"Резюме №{resumeid} готово к оплате", reply_markup=kb.create_pay_kb(resumeid, userid))
+        text = f"Резюме №{resumeid} готово к оплате \n\nВыберите каналы, в котором хотите опубликовать резюме: \n"
+
+        for i in channels:
+            text += f"{i}:\n"
+            for j in channels[i]:
+                text += f"{j[0]}: {j[2]}р \n"
+
+        # await bot.send_message(userid, text, reply_markup=kb.create_pay_kb(resumeid, userid))
+        await bot.send_message(userid, text, reply_markup=kb.create_channels_kb(channels))
 
         await resume_check(callback_query.message, 1)
 
@@ -641,29 +652,60 @@ async def comment(message: types.Message, state: FSMContext):
     await resume_check(message)
 
 
-# resume checkout ----------------------------------------
-# resume checkout ----------------------------------------
-# resume checkout ----------------------------------------
+# resume pay ----------------------------------------
+# resume pay ----------------------------------------
+# resume pay ----------------------------------------
+
+
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith('channels'))
+async def process_callback_choose_channels(callback_query: types.CallbackQuery):
+
+    userid = callback_query.from_user.id
+
+    code = callback_query.data.replace("channels_", "")
+
+    text, info = callback_query.message.text.split(":", 1)
+
+    if f"✅{code}:" in info:
+        info = info.replace(f"✅{code}:", f"{code}:")
+    else:
+        info = info.replace(f"{code}:", f"✅{code}:")
+
+    a = info.split("\n")   # price counting
+    price = 0
+    for i in a:
+        if "✅" in i:
+            p = re.compile("\d+р")
+            addiction = int(p.search(i).group().replace("р", ""))
+            price += addiction
+
+    p = re.compile("№\d")
+    resumeid = int(p.search(text).group().replace("№", ""))
+
+    new_text = f"{text}:{info}"
+
+    await callback_query.message.edit_text(new_text, reply_markup=kb.create_channels_kb(channels, resumeid, userid, price))
 
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith('pay'))
 async def process_callback_resume_pay(callback_query: types.CallbackQuery):
 
-    resumeid_userid_code = callback_query.data.replace("pay", "")
+    resumeid_userid_price = callback_query.data.replace("pay", "")
 
-    resumeid, userid, code = resumeid_userid_code.split("_")
+    resumeid, userid, price = resumeid_userid_price.split("_")
+    price = int(price)*100
 
-    if code.isdigit():
-        code = int(code)
+    # if code.isdigit():
+    #     code = int(code)
 
-    if code == 1:
-        await bot.send_invoice(chat_id=userid, title=f"Оплата резюме №{resumeid}", \
-            description="После оплаты, ваше резюме появится в канале", \
-            payload=f"resume_pay__{resumeid}", provider_token=YOUTOKEN, currency="RUB", start_parameter="event_bot", \
-            prices=[{"label": "Руб", "amount": 30000}])
+    # if code == 1:
+    await bot.send_invoice(chat_id=userid, title=f"Оплата резюме №{resumeid}", \
+        description="После оплаты, ваше резюме появится в каналах", \
+        payload=f"resume_pay__{resumeid}", provider_token=YOUTOKEN, currency="RUB", start_parameter="event_bot", \
+        prices=[{"label": "Руб", "amount": price}])
 
-    elif code == 2:
-        pass
+    # elif code == 2:
+    #     pass
 
 
 @dp.pre_checkout_query_handler()
