@@ -557,11 +557,24 @@ async def finished_resume_handler(callback_query: types.CallbackQuery, state: FS
                     f"Портфолио\n{data['port']}\n\n"\
                     f"Контакты\n{data['contacts']}"
 
-        u = callback_query.from_user.username
+        # u = callback_query.from_user.username
 
-        await bot.send_message(ADMIN, add_username(fin_text, u))
+        # await bot.send_message(ADMIN, add_username(fin_text, u))
 
-        await bot.send_message(user, "Резюме успешно отправлено Администратору", reply_markup=get_keyboard(user))
+        # await bot.send_message(user, "Резюме успешно отправлено Администратору", reply_markup=get_keyboard(user))
+
+        # user = message.from_user.id
+
+        # resume_text = f"{data['place']} \n\n{data['full_resume']}"
+        # resume_text = f"{data['full_resume']}"
+
+        # u = message.from_user.username
+
+        # await bot.send_message(ADMIN, add_username(resume_text, u))
+        resume_id = BotDB.create_resume(user, fin_text)
+
+        await bot.send_message(user, f"Резюме №{resume_id} успешно добавлено в базу", reply_markup=get_keyboard(user))
+
 
     elif code == 2:
         await bot.send_message(user, "Резюме удалено", reply_markup=get_keyboard(user))
@@ -612,7 +625,7 @@ async def process_callback_resume_check(callback_query: types.CallbackQuery, sta
     if code == 1:                         
         BotDB.update_approved(resumeid)
 
-        text = f"Резюме №{resumeid} готово к оплате \n\nВыберите каналы, в котором хотите опубликовать резюме: \n"
+        text = f"Резюме №{resumeid} готово к оплате \n\nВыберите каналы, в котором хотите опубликовать резюме (при выборе более одного – скидка 10%): \n"
 
         for i in channels:
             text += f"{i}:\n"
@@ -673,37 +686,56 @@ async def process_callback_choose_channels(callback_query: types.CallbackQuery):
 
     a = info.split("\n")   # price counting
     price = 0
+    publish_channels = ""
     for i in a:
         if "✅" in i:
             p = re.compile("\d+р")
+            c = re.compile("@[a-z0-9]+")
+            publish_channels += c.search(i).group()
             addiction = int(p.search(i).group().replace("р", ""))
             price += addiction
+
+            if publish_channels.count("@") > 1:
+                price -= (price // 10)
 
     p = re.compile("№\d")
     resumeid = int(p.search(text).group().replace("№", ""))
 
     new_text = f"{text}:{info}"
 
-    await callback_query.message.edit_text(new_text, reply_markup=kb.create_channels_kb(channels, resumeid, userid, price))
+    await callback_query.message.edit_text(new_text, 
+                        reply_markup=kb.create_channels_kb(channels, resumeid, userid, price, publish_channels))
 
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith('pay'))
 async def process_callback_resume_pay(callback_query: types.CallbackQuery):
 
-    resumeid_userid_price = callback_query.data.replace("pay", "")
+    await callback_query.message.edit_text("Вы можете оплатить резюме", reply_markup=kb.inline_kb_empty)
 
-    resumeid, userid, price = resumeid_userid_price.split("_")
+    resumeid_userid_price_publishchan = callback_query.data.replace("pay", "")
+    resumeid, userid, price, _publish_channels = resumeid_userid_price_publishchan.split("_")
+
+    publish_channels = _publish_channels.split("@")
+    publish_channels.pop(0)
+
+    description = "После оплаты, ваше резюме появится в каналах: "
+    for chan in publish_channels:
+        description += f"@{chan} "
+
     price = int(price)*100
 
     # if code.isdigit():
     #     code = int(code)
 
     # if code == 1:
-    await bot.send_invoice(chat_id=userid, title=f"Оплата резюме №{resumeid}", \
-        description="После оплаты, ваше резюме появится в каналах", \
-        payload=f"resume_pay__{resumeid}", provider_token=YOUTOKEN, currency="RUB", start_parameter="event_bot", \
-        prices=[{"label": "Руб", "amount": price}])
-
+    await bot.send_invoice(chat_id=userid, 
+                           title=f"Оплата резюме №{resumeid}",
+                           description=description,
+                           payload=f"resume_pay__{resumeid}__{_publish_channels}", 
+                           provider_token=YOUTOKEN, 
+                           currency="RUB", 
+                           start_parameter="event_bot",
+                           prices=[{"label": "Руб", "amount": price}])
     # elif code == 2:
     #     pass
 
@@ -716,7 +748,10 @@ async def process_pre_checkout_query(pre_checkout_query: types.PreCheckoutQuery)
 @dp.message_handler(content_types=ContentType.SUCCESSFUL_PAYMENT)
 async def process_pay(message: types.Message):
 
-    payload, resumeid = message.successful_payment.invoice_payload.split("__")
+    payload, resumeid, _publish_channels = message.successful_payment.invoice_payload.split("__")
+
+    publish_channels = _publish_channels.split("@")
+    publish_channels.pop(0)
 
     if resumeid.isdigit():
         resumeid = int(resumeid)
@@ -724,6 +759,14 @@ async def process_pay(message: types.Message):
     if payload == "resume_pay":
         BotDB.update_published(resumeid)
 
-        text = BotDB.get_resume_by_id(resumeid)[2]
+        text = "#резюме\n"
+        text += BotDB.get_resume_by_id(resumeid)[2]
 
-        await bot.send_message(CHANNEL, text)
+        for i in publish_channels:
+            for j in list(channels.values()):
+                for k in j:
+                    if f"@{i}" in k:
+                        if k[1] != 0:
+                            await bot.send_message(k[1], text)
+                        else:
+                            print(f"send to {k[0]}")

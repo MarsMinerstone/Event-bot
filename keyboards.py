@@ -38,7 +38,8 @@ def create_approve_kb(resume_id: int, user_id: int):
 
 # coose channel
 
-def create_channels_kb(channels: dict, resume_id: int = None, user_id: int = None, price: int = None):
+def create_channels_kb(channels: dict, resume_id: int = None, user_id: int = None,
+                       price: int = None, publish_channels: str = None):
     inline_kb_channels = InlineKeyboardMarkup()
     for i in channels:
         for j in channels[i]:
@@ -46,18 +47,10 @@ def create_channels_kb(channels: dict, resume_id: int = None, user_id: int = Non
             inline_kb_channels.row(inline_btn_i)
 
     if price is not None:
-        inline_kb_channels.row(InlineKeyboardButton(f"Оплатить {price}р", callback_data=f"pay{resume_id}_{user_id}_{price}"))
+        inline_kb_channels.row(InlineKeyboardButton(f"Оплатить {price}р", 
+                        callback_data=f"pay{resume_id}_{user_id}_{price}_{publish_channels}"))
 
     return inline_kb_channels
-
-# def edit_channels_kb(message: str):
-#     inline_kb_channels = InlineKeyboardMarkup()
-#     for i in channels:
-#         for j in channels[i]:
-#             inline_btn_i = InlineKeyboardButton(f"{j[0]}", callback_data=f"channels_{j[0]}")
-#             inline_kb_channels.row(inline_btn_i)
-
-#     return inline_kb_channels
 
 # pay
 
@@ -83,7 +76,7 @@ inline_kb_rp = InlineKeyboardMarkup().add(inline_btn_rp1, inline_btn_rp2, inline
 inline_btn_resume = InlineKeyboardButton("Отправить свой готовый текст на модерацию", callback_data="resume")
 inline_kb_resume = InlineKeyboardMarkup().add(inline_btn_resume)
 
-inline_btn_rs1 = InlineKeyboardButton("Спросить цену", callback_data="end1")
+inline_btn_rs1 = InlineKeyboardButton("Отправить на модерацию", callback_data="end1")
 inline_btn_rs2 = InlineKeyboardButton("Отмена", callback_data="end2")
 inline_kb_rs = InlineKeyboardMarkup().add(inline_btn_rs1, inline_btn_rs2)
 
