@@ -23,10 +23,11 @@ right_keyboard = ReplyKeyboardMarkup(row_width=2, resize_keyboard=True).add(butt
 
 button4 = KeyboardButton("Отпрвавить сообщение подписчикам")
 button5 = KeyboardButton("Список пользователей")
-button6 = KeyboardButton("Список резюме")
+button6 = KeyboardButton("Новые резюме")
+button7 = KeyboardButton("Неопубликованные резюме")
 right_admin_keyboard = ReplyKeyboardMarkup(row_width=2, 
                                            resize_keyboard=True).add(button1, button3).row(button2, button4).\
-                                           row(button5, button6)
+                                           row(button5, button6),row(button7)
 
 # approve
 

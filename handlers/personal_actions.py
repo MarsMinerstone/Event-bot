@@ -7,11 +7,10 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher import FSMContext
 from aiogram.types.message import ContentType
 from commands import *
-from config import ADMIN, YOUTOKEN, CHANNEL
-# from aiogram.methods import StopPoll
-# import asyncio
+from config import ADMIN, YOUTOKEN
 from channels import channels
 import re
+from typing import Union
 
 
 # support commands ----------------------------------------
@@ -19,21 +18,21 @@ import re
 # support commands ----------------------------------------
 
 
-def get_start_message(user_id: int):
-    if user_id == ADMIN:
+def get_start_message(user_id: Union[int, str]) -> str:
+    if int(user_id) == ADMIN:
         return "Добро пожаловать, администратор"
     else:
         return "Хочу разместить:"
 
 
-def get_keyboard(user_id: int):
-    if user_id == ADMIN:
+def get_keyboard(user_id: Union[int, str]) -> types.base.MetaTelegramObject:
+    if int(user_id) == ADMIN:
         return kb.right_admin_keyboard
     else:
         return kb.right_keyboard
 
 
-def add_username(text: str, username: str):
+def add_username(text: str, username: str) -> str:    # adding username to start of text (for admin)
     if username is not None:
         text += f"\n\n@{username}"
     return text
@@ -444,7 +443,9 @@ async def process_full_resume(message: types.Message, state: FSMContext):
     # await bot.send_message(ADMIN, add_username(resume_text, u))
     resume_id = BotDB.create_resume(user, resume_text)
 
-    await bot.send_message(user, f"Резюме №{resume_id} успешно добавлено в базу", reply_markup=get_keyboard(user))
+    await bot.send_message(user, f"Резюме №{resume_id} успешно отправленно администратору, "
+                                 f"вскоре вам придет сообщение с результатом", 
+                           reply_markup=get_keyboard(user))
 
     await state.finish()
 
@@ -548,33 +549,20 @@ async def finished_resume_handler(callback_query: types.CallbackQuery, state: FS
         pass
 
     if code == 1:
-        fin_text = "*РЕЗЮМЕ*\n\n"\
-                    f"Место\n{data['place']}\n\n"\
-                    f"Имя\n{data['name']}\n\n"\
-                    f"Занятие\n{data['deal']}\n\n"\
-                    f"Уникальность\n{data['unique']}\n\n"\
-                    f"Предлагаю\n{data['work']}\n\n"\
-                    f"Портфолио\n{data['port']}\n\n"\
-                    f"Контакты\n{data['contacts']}"
+        fin_text = "#резюме\n"\
+                  f"Место\n{data['place']}\n\n"\
+                  f"Имя\n{data['name']}\n\n"\
+                  f"Занятие\n{data['deal']}\n\n"\
+                  f"Уникальность\n{data['unique']}\n\n"\
+                  f"Предлагаю\n{data['work']}\n\n"\
+                  f"Портфолио\n{data['port']}\n\n"\
+                  f"Контакты\n{data['contacts']}"
 
-        # u = callback_query.from_user.username
-
-        # await bot.send_message(ADMIN, add_username(fin_text, u))
-
-        # await bot.send_message(user, "Резюме успешно отправлено Администратору", reply_markup=get_keyboard(user))
-
-        # user = message.from_user.id
-
-        # resume_text = f"{data['place']} \n\n{data['full_resume']}"
-        # resume_text = f"{data['full_resume']}"
-
-        # u = message.from_user.username
-
-        # await bot.send_message(ADMIN, add_username(resume_text, u))
         resume_id = BotDB.create_resume(user, fin_text)
 
-        await bot.send_message(user, f"Резюме №{resume_id} успешно добавлено в базу", reply_markup=get_keyboard(user))
-
+        await bot.send_message(user, f"Резюме №{resume_id} успешно отправленно администратору, "
+                                     f"вскоре вам придет сообщение с результатом", 
+                               reply_markup=get_keyboard(user))
 
     elif code == 2:
         await bot.send_message(user, "Резюме удалено", reply_markup=get_keyboard(user))
@@ -591,7 +579,7 @@ class FormComment(StatesGroup):
     resume_user = State()
 
 
-@dp.message_handler(Text(contains="Список резюме", ignore_case=True))
+@dp.message_handler(Text(contains="Новые резюме", ignore_case=True))
 async def resume_check(message: types.Message, flag: int = 0):
 
     user = message.from_user.id
@@ -698,7 +686,7 @@ async def process_callback_choose_channels(callback_query: types.CallbackQuery):
             if publish_channels.count("@") > 1:
                 price -= (price // 10)
 
-    p = re.compile("№\d")
+    p = re.compile("№\d+")
     resumeid = int(p.search(text).group().replace("№", ""))
 
     new_text = f"{text}:{info}"
@@ -718,16 +706,12 @@ async def process_callback_resume_pay(callback_query: types.CallbackQuery):
     publish_channels = _publish_channels.split("@")
     publish_channels.pop(0)
 
-    description = "После оплаты, ваше резюме появится в каналах: "
-    for chan in publish_channels:
-        description += f"@{chan} "
+    description = "После оплаты, ваше резюме, по усмотрению администратора, будет опубликовано в выбранных каналах"
+    # for chan in publish_channels:
+    #     description += f"@{chan} "
 
     price = int(price)*100
 
-    # if code.isdigit():
-    #     code = int(code)
-
-    # if code == 1:
     await bot.send_invoice(chat_id=userid, 
                            title=f"Оплата резюме №{resumeid}",
                            description=description,
@@ -736,8 +720,6 @@ async def process_callback_resume_pay(callback_query: types.CallbackQuery):
                            currency="RUB", 
                            start_parameter="event_bot",
                            prices=[{"label": "Руб", "amount": price}])
-    # elif code == 2:
-    #     pass
 
 
 @dp.pre_checkout_query_handler()
@@ -762,11 +744,95 @@ async def process_pay(message: types.Message):
         text = "#резюме\n"
         text += BotDB.get_resume_by_id(resumeid)[2]
 
-        for i in publish_channels:
+        for i in publish_channels:                          # trash needs to refactor
             for j in list(channels.values()):
                 for k in j:
                     if f"@{i}" in k:
                         if k[1] != 0:
                             await bot.send_message(k[1], text)
-                        else:
+
+                        else:                               #delete from prod
                             print(f"send to {k[0]}")
+
+
+# resume publish ----------------------------------------
+# resume publish ----------------------------------------
+# resume publish ----------------------------------------
+
+
+class FormComment(StatesGroup):
+    resume_user = State()
+
+
+@dp.message_handler(Text(contains="Новые резюме", ignore_case=True))
+async def resume_check(message: types.Message, flag: int = 0):
+
+    user = message.from_user.id
+
+    if user != ADMIN and flag == 0:
+        return
+
+    result = BotDB.get_last_resume()
+    if result is not None:
+        text = f"Резюме №{result[0]} \n\n{result[2]}"
+
+        if flag == 0:     
+            await bot.send_message(ADMIN, text, reply_markup=kb.create_approve_kb(result[0], result[1]))
+            
+        elif flag == 1:
+            await message.edit_text(text, reply_markup=kb.create_approve_kb(result[0], result[1]))
+    else:
+        await bot.send_message(ADMIN, "Список резюме пока пуст")
+
+    
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith('approve'))
+async def process_callback_resume_check(callback_query: types.CallbackQuery, state: FSMContext):
+
+    resumeid_userid_code = callback_query.data.replace("approve", "")
+
+    resumeid, userid, code = resumeid_userid_code.split("_")
+
+    if code.isdigit():
+        code = int(code)
+
+    if code == 1:                         
+        BotDB.update_approved(resumeid)
+
+        text = f"Резюме №{resumeid} готово к оплате \n\nВыберите каналы, в котором хотите опубликовать резюме (при выборе более одного – скидка 10%): \n"
+
+        for i in channels:
+            text += f"{i}:\n"
+            for j in channels[i]:
+                text += f"{j[0]}: {j[2]}р \n"
+
+        # await bot.send_message(userid, text, reply_markup=kb.create_pay_kb(resumeid, userid))
+        await bot.send_message(userid, text, reply_markup=kb.create_channels_kb(channels))
+
+        await resume_check(callback_query.message, 1)
+
+    elif code == 2:                                               
+        await FormComment.resume_user.set()
+
+        await state.update_data(resume_user=f"{resumeid}_{userid}")
+
+        BotDB.delete_disapproved(resumeid)
+
+        await callback_query.message.edit_text("Отклонено", reply_markup=kb.inline_kb_empty)
+        await bot.send_message(ADMIN, "Напишите сообщение для этого пользователя:", 
+                               reply_markup=types.ReplyKeyboardRemove())
+
+
+@dp.message_handler(state=FormComment.resume_user)
+async def comment(message: types.Message, state: FSMContext):
+
+    async with state.proxy() as data:
+        resumeid, userid = data['resume_user'].split("_")
+
+    await bot.send_message(userid, f"Резюме №{resumeid} \n\nКомментарий от администратора: \n{message.text} \
+                                   \n\nСоздайте резюме заново")
+
+    await bot.send_message(ADMIN, "Сообщение было отправленно", reply_markup=get_keyboard(ADMIN))
+
+    await state.finish()
+
+    await resume_check(message)
