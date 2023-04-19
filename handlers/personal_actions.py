@@ -828,7 +828,7 @@ async def comment(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         resumeid, userid = data['resume_user'].split("_")
 
-    await bot.send_message(userid, f"Резюме №{resumeid} \n\nКомментарий от администратора: \n{message.text} \
+    await bot.send_message(userid, f"Резюме №{resumeid}\n\nКомментарий от администратора: \n{message.text} \
                                    \n\nСоздайте резюме заново")
 
     await bot.send_message(ADMIN, "Сообщение было отправленно", reply_markup=get_keyboard(ADMIN))
